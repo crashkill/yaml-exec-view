@@ -22,34 +22,27 @@ import {
   generatePresentationToken 
 } from '@/utils';
 import { TOKEN_EXPIRY } from '@/constants';
+import { Database } from '@/types/database'; // Importar tipos de banco de dados
 
 // Base API class with common functionality
 class BaseAPI {
-  protected async handleResponse<T>(
-    promise: Promise<{ data: T | null; error: any }>
-  ): Promise<ApiResponse<T>> {
-    try {
-      const { data, error } = await promise;
-      
-      if (error) {
-        console.error('API Error:', error);
-        return {
-          data: null as T, // Explicitly cast to T
-          error: error.message || 'Erro desconhecido'
-        };
-      }
-      
+  protected processSupabaseResponse<T>(
+    supabaseResponse: { data: T | null; error: any }
+  ): ApiResponse<T> {
+    const { data, error } = supabaseResponse;
+    
+    if (error) {
+      console.error('API Error:', error);
       return {
-        data: data as T, // Explicitly cast to T
-        message: 'Sucesso'
-      };
-    } catch (error: any) {
-      console.error('Network Error:', error);
-      return {
-        data: null as T, // Explicitly cast to T
-        error: error.message || 'Erro de conexão'
+        data: null as T,
+        error: error.message || 'Erro desconhecido'
       };
     }
+    
+    return {
+      data: data as T,
+      message: 'Sucesso'
+    };
   }
 
   protected async getCurrentUser() {
@@ -57,17 +50,21 @@ class BaseAPI {
     return user;
   }
 
-  protected async getUserProfile(userId?: string) {
+  protected async getUserProfile(userId?: string): Promise<User | null> {
     const user = userId ? { id: userId } : await this.getCurrentUser();
     if (!user) return null;
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('usuarios')
       .select('*')
       .eq('id', user.id)
       .single();
 
-    return data;
+    if (error) {
+      console.error('Error fetching user profile:', error);
+      return null;
+    }
+    return data as User;
   }
 }
 
@@ -94,7 +91,8 @@ export class ProjectsAPI extends BaseAPI {
       query = query.contains('equipe', [userProfile.id]);
     }
 
-    const response = await this.handleResponse<Project[]>(query);
+    const { data, error } = await query; // Await the query here
+    const response = this.processSupabaseResponse<Project[]>({ data, error });
     
     if (response.data) {
       // Filter financial data based on user profile
@@ -128,7 +126,8 @@ export class ProjectsAPI extends BaseAPI {
       query = query.contains('equipe', [userProfile.id]);
     }
 
-    const response = await this.handleResponse<Project>(query.single());
+    const { data, error } = await query.single(); // Await the query here
+    const response = this.processSupabaseResponse<Project>({ data, error });
     
     if (response.data) {
       // Filter financial data based on user profile
@@ -158,9 +157,13 @@ export class ProjectsAPI extends BaseAPI {
       updated_at: new Date().toISOString()
     };
 
-    const response = await this.handleResponse<Project>(
-      supabase.from('projetos').insert(newProject).select().single()
-    );
+    const { data, error } = await supabase
+      .from('projetos')
+      .insert(newProject as Database['public']['Tables']['projetos']['Insert'])
+      .select()
+      .single();
+    
+    const response = this.processSupabaseResponse<Project>({ data, error });
 
     // Log audit trail
     if (response.data) {
@@ -195,9 +198,14 @@ export class ProjectsAPI extends BaseAPI {
       updated_at: new Date().toISOString()
     };
 
-    const response = await this.handleResponse<Project>(
-      supabase.from('projetos').update(updatedData).eq('id', id).select().single()
-    );
+    const { data, error } = await supabase
+      .from('projetos')
+      .update(updatedData as Database['public']['Tables']['projetos']['Update'])
+      .eq('id', id)
+      .select()
+      .single();
+
+    const response = this.processSupabaseResponse<Project>({ data, error });
 
     // Log audit trail
     if (response.data) {
@@ -221,9 +229,8 @@ export class ProjectsAPI extends BaseAPI {
     // Get project for audit
     const project = await this.getProject(id);
     
-    const response = await this.handleResponse<void>( // Expecting no data back for delete
-      supabase.from('projetos').delete().eq('id', id)
-    );
+    const { data, error } = await supabase.from('projetos').delete().eq('id', id);
+    const response = this.processSupabaseResponse<void>({ data, error }); // Expecting no data back for delete
 
     // Log audit trail
     if (!response.error && project.data) { // Check for no error instead of data
@@ -248,18 +255,18 @@ export class ProjectsAPI extends BaseAPI {
     const criticalityScore = calculateCriticality(projectResponse.data, risks);
     const criticalityLabel = getCriticalityLevel(criticalityScore);
 
-    const response = await this.handleResponse<{ criticidade_score: number }>(
-      supabase
-        .from('projetos')
-        .update({ 
+    const { data, error } = await supabase
+      .from('projetos')
+      .update({ 
           criticidade_score: criticalityScore,
           criticidade_label: criticalityLabel,
           updated_at: new Date().toISOString()
-        })
-        .eq('id', projectId)
-        .select('criticidade_score')
-        .single()
-    );
+      } as Database['public']['Tables']['projetos']['Update'])
+      .eq('id', projectId)
+      .select('criticidade_score')
+      .single();
+    
+    const response = this.processSupabaseResponse<{ criticidade_score: number }>({ data, error });
 
     return response.data ? 
       { data: response.data.criticidade_score, message: 'Criticidade atualizada' } :
@@ -282,24 +289,23 @@ export class ProjectsAPI extends BaseAPI {
       valores_anteriores: oldValues,
       valores_novos: newValues,
       timestamp: new Date().toISOString()
-    });
+    } as Database['public']['Tables']['historico_projetos']['Insert']);
   }
 }
 
 // Risks API
 export class RisksAPI extends BaseAPI {
   async getRisksByProject(projectId: string): Promise<ApiResponse<Risk[]>> {
-    const response = await this.handleResponse<Risk[]>(
-      supabase
-        .from('riscos')
-        .select(`
-          *,
-          responsavel:usuarios!riscos_responsavel_id_fkey(id, nome, email, perfil, departamento)
-        `)
-        .eq('projeto_id', projectId)
-        .order('nivel_risco', { ascending: false })
-    );
+    const { data, error } = await supabase
+      .from('riscos')
+      .select(`
+        *,
+        responsavel:usuarios!riscos_responsavel_id_fkey(id, nome, email, perfil, departamento)
+      `)
+      .eq('projeto_id', projectId)
+      .order('nivel_risco', { ascending: false });
 
+    const response = this.processSupabaseResponse<Risk[]>({ data, error });
     return response;
   }
 
@@ -318,9 +324,13 @@ export class RisksAPI extends BaseAPI {
       updated_at: new Date().toISOString()
     };
 
-    const response = await this.handleResponse<Risk>(
-      supabase.from('riscos').insert(newRisk).select().single()
-    );
+    const { data, error } = await supabase
+      .from('riscos')
+      .insert(newRisk as Database['public']['Tables']['riscos']['Insert'])
+      .select()
+      .single();
+    
+    const response = this.processSupabaseResponse<Risk>({ data, error });
 
     // Update project criticality
     if (response.data) {
@@ -338,9 +348,14 @@ export class RisksAPI extends BaseAPI {
       updated_at: new Date().toISOString()
     };
 
-    const response = await this.handleResponse<Risk>(
-      supabase.from('riscos').update(updatedData).eq('id', id).select().single()
-    );
+    const { data, error } = await supabase
+      .from('riscos')
+      .update(updatedData as Database['public']['Tables']['riscos']['Update'])
+      .eq('id', id)
+      .select()
+      .single();
+    
+    const response = this.processSupabaseResponse<Risk>({ data, error });
 
     // Update project criticality
     if (response.data) {
@@ -359,12 +374,12 @@ export class UsersAPI extends BaseAPI {
       return { data: [], error: 'Sem permissão para listar usuários' };
     }
 
-    return this.handleResponse<User[]>(
-      supabase
-        .from('usuarios')
-        .select('*')
-        .order('nome')
-    );
+    const { data, error } = await supabase
+      .from('usuarios')
+      .select('*')
+      .order('nome');
+    
+    return this.processSupabaseResponse<User[]>({ data, error });
   }
 
   async createUser(userData: UserFormData): Promise<ApiResponse<User>> {
@@ -379,9 +394,13 @@ export class UsersAPI extends BaseAPI {
       updated_at: new Date().toISOString()
     };
 
-    return this.handleResponse<User>(
-      supabase.from('usuarios').insert(newUser).select().single()
-    );
+    const { data, error } = await supabase
+      .from('usuarios')
+      .insert(newUser as Database['public']['Tables']['usuarios']['Insert'])
+      .select()
+      .single();
+    
+    return this.processSupabaseResponse<User>({ data, error });
   }
 }
 
@@ -407,21 +426,25 @@ export class PresentationAPI extends BaseAPI {
       created_at: new Date().toISOString()
     };
 
-    return this.handleResponse<PresentationToken>(
-      supabase.from('tokens_apresentacao').insert(tokenData).select().single()
-    );
+    const { data, error } = await supabase
+      .from('tokens_apresentacao')
+      .insert(tokenData as Database['public']['Tables']['tokens_apresentacao']['Insert'])
+      .select()
+      .single();
+    
+    return this.processSupabaseResponse<PresentationToken>({ data, error });
   }
 
   async getByToken(token: string): Promise<ApiResponse<{ project: Project; tokenData: PresentationToken }>> {
     // Get token data
-    const tokenResponse = await this.handleResponse<PresentationToken>(
-      supabase
-        .from('tokens_apresentacao')
-        .select('*')
-        .eq('token', token)
-        .eq('ativo', true)
-        .single()
-    );
+    const { data: tokenData, error: tokenError } = await supabase
+      .from('tokens_apresentacao')
+      .select('*')
+      .eq('token', token)
+      .eq('ativo', true)
+      .single();
+    
+    const tokenResponse = this.processSupabaseResponse<PresentationToken>({ data: tokenData, error: tokenError });
 
     if (!tokenResponse.data) {
       return { data: null as any, error: 'Token inválido ou expirado' };
@@ -433,16 +456,16 @@ export class PresentationAPI extends BaseAPI {
     }
 
     // Get project data
-    const projectResponse = await this.handleResponse<Project>(
-      supabase
-        .from('projetos')
-        .select(`
+    const { data: projectData, error: projectError } = await supabase
+      .from('projetos')
+      .select(`
           *,
           gerente:usuarios!projetos_id_gerente_fkey(id, nome, email, perfil, departamento)
-        `)
-        .eq('id', tokenResponse.data.projeto_id)
-        .single()
-    );
+      `)
+      .eq('id', tokenResponse.data.projeto_id)
+      .single();
+    
+    const projectResponse = this.processSupabaseResponse<Project>({ data: projectData, error: projectError });
 
     if (!projectResponse.data) {
       return { data: null as any, error: 'Projeto não encontrado' };
@@ -460,7 +483,7 @@ export class PresentationAPI extends BaseAPI {
       .update({ 
         acessos: tokenResponse.data.acessos + 1,
         ultimo_acesso: new Date().toISOString()
-      })
+      } as Database['public']['Tables']['tokens_apresentacao']['Update'])
       .eq('id', tokenResponse.data.id);
 
     return {
