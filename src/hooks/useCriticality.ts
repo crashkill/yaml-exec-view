@@ -1,4 +1,22 @@
-// ... other imports ...
-import { projectKeys } from './projectKeys';  // Changed import source
+import { useMutation } from '@tanstack/react-query';
+import { projectKeys } from './projectKeys';
+import { projectsAPI } from '@/services/api';
 
-// ... rest of the code ...
+export function useCriticalityCalculation(project: any, risks: any) {
+  return {
+    score: project.criticidade_score || 0,
+    level: 'Verde',
+    hasChanged: false
+  };
+}
+
+export function useRealTimeCriticality(projectId: string) {
+  return { isUpdating: false };
+}
+
+export function useAutoCriticalityUpdate(projectId: string) {
+  const { mutate: triggerUpdate, isLoading: isUpdating } = useMutation({
+    mutationFn: () => projectsAPI.updateCriticality(projectId)
+  });
+  return { triggerUpdate, isUpdating };
+}
