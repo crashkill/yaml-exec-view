@@ -20,15 +20,13 @@ import {
 } from 'lucide-react';
 import { Project, Risk } from '@/types';
 import { 
-  useCriticalityCalculation, 
-  useRealTimeCriticality,
-  useAutoCriticalityUpdate 
-} from '@/hooks/useCriticality';
-import { 
   formatPercentage, 
   formatCurrency, 
   daysBetween,
-  isOverdue 
+  isOverdue,
+  calculateCriticality,
+  getCriticalityLevel,
+  getCriticalityColor
 } from '@/utils';
 import { CRITICALITY_WEIGHTS } from '@/constants';
 
@@ -49,9 +47,10 @@ export function CriticalityIndicator({
 }: CriticalityIndicatorProps) {
   const [showBreakdown, setShowBreakdown] = useState(false);
   
-  const { score, level, hasChanged } = useCriticalityCalculation(project, risks);
-  const { isUpdating } = useRealTimeCriticality(project.id);
-  const { triggerUpdate, isUpdating: isManualUpdating } = useAutoCriticalityUpdate(project.id);
+  // Calculate criticality score
+  const score = calculateCriticality(project, risks);
+  const level = getCriticalityLevel(score);
+  const hasChanged = project.criticidade_score !== undefined && project.criticidade_score !== score;
 
   // Calculate component scores for breakdown
   const getRiskScore = () => {
@@ -157,7 +156,7 @@ export function CriticalityIndicator({
                   <item.icon className={`h-4 w-4 ${item.color}`} />
                   <span className="font-medium">{item.label}</span>
                   <span className="text-muted-foreground">
-                    ({formatPercentage(item.weight * 100)})
+                    ({formatPercentage(item.weight * 100)}%)
                   </span>
                 </div>
                 <span className="font-medium">
@@ -180,14 +179,9 @@ export function CriticalityIndicator({
             variant="outline"
             size="sm"
             className="w-full"
-            onClick={() => triggerUpdate()}
-            disabled={isManualUpdating || isUpdating}
+            onClick={() => window.location.reload()}
           >
-            {(isManualUpdating || isUpdating) ? (
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4 mr-2" />
-            )}
+            <RefreshCw className="h-4 w-4 mr-2" />
             Recalcular
           </Button>
         )}
