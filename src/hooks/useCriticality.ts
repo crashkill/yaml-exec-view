@@ -15,7 +15,7 @@ export function useRealTimeCriticality(projectId: string) {
 }
 
 export function useAutoCriticalityUpdate(projectId: string) {
-  const { mutate: triggerUpdate, isLoading: isUpdating } = useMutation({
+  const { mutate: triggerUpdate, isPending: isUpdating } = useMutation({
     mutationFn: () => projectsAPI.updateCriticality(projectId)
   });
   return { triggerUpdate, isUpdating };

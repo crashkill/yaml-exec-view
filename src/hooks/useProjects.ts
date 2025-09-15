@@ -34,7 +34,7 @@ export function useCreateProject() {
 
   return useMutation({
     mutationFn: (data: ProjectFormData) => projectsAPI.createProject(data),
-    onSuccess: (response) => {
+    onSuccess: (response: { data?: any; error?: string }) => {
       if (response.data) {
         queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
         toast.success('Projeto criado com sucesso');
@@ -54,7 +54,7 @@ export function useUpdateProject() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Project> }) =>
       projectsAPI.updateProject(id, data),
-    onSuccess: (response, variables) => {
+    onSuccess: (response: { data?: any; error?: string }, variables) => {
       if (response.data) {
         queryClient.invalidateQueries({ queryKey: projectKeys.detail(variables.id) });
         queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
@@ -74,8 +74,8 @@ export function useUpdateCriticality() {
 
   return useMutation({
     mutationFn: (projectId: string) => projectsAPI.updateCriticality(projectId),
-    onSuccess: (response, projectId) => {
-      if (response.data) {
+    onSuccess: (response: { success: boolean }, projectId) => {
+      if (response.success) {
         queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) });
         queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
       }

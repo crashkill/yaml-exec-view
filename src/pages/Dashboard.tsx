@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useProjects } from '@/hooks/useProjects';
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ProjectStatusChart } from "@/components/dashboard/ProjectStatusChart";
 import { CriticalProjectsList } from "@/components/dashboard/CriticalProjectsList";
@@ -23,9 +22,55 @@ import {
 } from '@/utils';
 import { PROJECT_STATUSES } from '@/types';
 
+// Mock data for demonstration
+const mockProjects = [
+  {
+    id: "1",
+    nome: "Sistema de Pagamentos",
+    status: "Em Andamento",
+    criticidade_score: 85,
+    progresso_percentual: 65,
+    data_inicio: "2023-01-15",
+    data_fim_prevista: "2023-12-31",
+    id_gerente: "1",
+    gerente: { nome: "Ana Santos" },
+    orcamento_inicial: 500000,
+    custo_realizado: 320000
+  },
+  {
+    id: "2",
+    nome: "App Mobile v2.0",
+    status: "Em Andamento",
+    criticidade_score: 72,
+    progresso_percentual: 45,
+    data_inicio: "2023-03-01",
+    data_fim_prevista: "2023-11-30",
+    id_gerente: "2",
+    gerente: { nome: "Carlos Lima" },
+    orcamento_inicial: 300000,
+    custo_realizado: 180000
+  },
+  {
+    id: "3",
+    nome: "Portal do Cliente",
+    status: "Concluído",
+    criticidade_score: 25,
+    progresso_percentual: 100,
+    data_inicio: "2022-06-01",
+    data_fim_prevista: "2023-01-15",
+    data_fim_real: "2023-01-10",
+    id_gerente: "3",
+    gerente: { nome: "Rita Ferreira" },
+    orcamento_inicial: 150000,
+    custo_realizado: 140000
+  }
+] as any;
+
 export default function Dashboard() {
   const { user, canAccessFinancialData } = useAuth();
-  const { data: projects = [], isLoading, error, refetch } = useProjects();
+  const projects = mockProjects; // Using mock data instead of hook
+  const isLoading = false;
+  const error = null;
 
   // Calculate dashboard metrics
   const metrics = useMemo(() => {
@@ -92,6 +137,10 @@ export default function Dashboard() {
       criticalProjectsList
     };
   }, [projects, canAccessFinancialData]);
+
+  const refetch = () => {
+    // Mock refetch function
+  };
 
   if (error) {
     return (
