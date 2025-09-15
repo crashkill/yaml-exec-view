@@ -1,0 +1,546 @@
+# Sistema de Painel de Projetos - YAML Completo com Fluxo Visual
+
+projeto:
+  nome: "Painel de Projetos Corporativo"
+  descricao: "Plataforma dual: Gestão interna + Apresentações executivas dinâmicas"
+  versao: "1.0"
+
+arquitetura_completa:
+  backend: "100% Supabase Edge Functions"
+  frontend: "React 18 + Vite + TypeScript"
+  design_system: "Material-UI v5 + Framer Motion"
+  graficos: "ECharts + D3.js + Three.js (WebGL)"
+
+# ==========================================
+# ESTRUTURA DE PERFIS E PERMISSÕES
+# ==========================================
+
+perfis_sistema:
+  administrador:
+    codigo: "ADMIN"
+    descricao: "Controle total do sistema"
+    permissoes:
+      gestao: ["criar", "editar", "excluir", "visualizar_tudo"]
+      apresentacao: ["acesso_completo", "financeiro_detalhado", "exportar"]
+    cor_tema: "#1976d2" # Azul corporativo
+    
+  diretor:
+    codigo: "DIR"
+    descricao: "Visão estratégica e financeira"
+    permissoes:
+      gestao: ["visualizar_apenas"]
+      apresentacao: ["financeiro_completo", "kpis_executivos", "riscos_criticos"]
+    cor_tema: "#7b1fa2" # Roxo executivo
+    
+  gerente_geral:
+    codigo: "GG"
+    descricao: "Supervisão geral com acesso financeiro"
+    permissoes:
+      gestao: ["visualizar_projetos", "aprovar_orcamentos"]
+      apresentacao: ["financeiro_resumido", "metricas_gerais"]
+    cor_tema: "#388e3c" # Verde gerencial
+    
+  gerente_projetos:
+    codigo: "GP"
+    descricao: "Gestão operacional sem acesso financeiro"
+    permissoes:
+      gestao: ["criar_projetos", "editar_proprios", "gerenciar_riscos"]
+      apresentacao: ["cronograma", "entregaveis", "riscos_operacionais"]
+    cor_tema: "#f57c00" # Laranja operacional
+    
+  membro_equipe:
+    codigo: "ME"
+    descricao: "Visualização de tarefas e entregas"
+    permissoes:
+      gestao: ["visualizar_tarefas_proprias"]
+      apresentacao: ["status_entregas", "cronograma_basico"]
+    cor_tema: "#455a64" # Cinza neutro
+
+# ==========================================
+# BANCO DE DADOS COMPLETO
+# ==========================================
+
+banco_dados:
+  usuarios:
+    tabela: "usuarios"
+    campos:
+      - id: "uuid primary key"
+      - nome: "varchar(255)"
+      - email: "varchar(255) unique"
+      - perfil: "enum('ADMIN','DIR','GG','GP','ME')"
+      - ativo: "boolean default true"
+      - avatar_url: "text"
+      - departamento: "varchar(100)"
+      - created_at: "timestamp default now()"
+      - updated_at: "timestamp default now()"
+      
+  projetos:
+    tabela: "projetos"
+    campos:
+      - id: "uuid primary key"
+      - nome: "varchar(255)"
+      - descricao: "text"
+      - status: "enum('Planejamento','Em Andamento','Pausado','Concluído','Cancelado')"
+      - criticidade_score: "integer default 0" # 0-100
+      - criticidade_label: "enum('Verde','Amarelo','Vermelho')"
+      - data_inicio: "date"
+      - data_fim_prevista: "date"
+      - data_fim_real: "date"
+      - progresso_percentual: "integer default 0" # 0-100
+      - id_gerente: "uuid references usuarios(id)"
+      - equipe: "jsonb" # array de user_ids
+      - orcamento_inicial: "numeric(15,2)"
+      - orcamento_atual: "numeric(15,2)"
+      - custo_realizado: "numeric(15,2)"
+      - receita_prevista: "numeric(15,2)"
+      - receita_realizada: "numeric(15,2)"
+      - roi_previsto: "numeric(5,2)" # percentual
+      - roi_atual: "numeric(5,2)"
+      - marcos: "jsonb" # milestones
+      - documentos: "jsonb" # links para storage
+      - created_at: "timestamp default now()"
+      - updated_at: "timestamp default now()"
+      
+  riscos:
+    tabela: "riscos"
+    campos:
+      - id: "uuid primary key"
+      - projeto_id: "uuid references projetos(id)"
+      - titulo: "varchar(255)"
+      - descricao: "text"
+      - categoria: "enum('Técnico','Financeiro','Cronograma','Recursos','Externo')"
+      - probabilidade: "integer" # 1-5
+      - impacto: "integer" # 1-5
+      - nivel_risco: "integer" # calculado: probabilidade * impacto
+      - status: "enum('Aberto','Mitigado','Encerrado')"
+      - plano_mitigacao: "text"
+      - responsavel_id: "uuid references usuarios(id)"
+      - data_identificacao: "date"
+      - data_resolucao: "date"
+      - created_at: "timestamp default now()"
+      - updated_at: "timestamp default now()"
+      
+  historico_projetos:
+    tabela: "historico_projetos"
+    campos:
+      - id: "bigserial primary key"
+      - projeto_id: "uuid references projetos(id)"
+      - usuario_id: "uuid references usuarios(id)"
+      - acao: "enum('CRIACAO','ATUALIZACAO','EXCLUSAO','STATUS','FINANCEIRO','RISCO')"
+      - valores_anteriores: "jsonb"
+      - valores_novos: "jsonb"
+      - ip_origem: "inet"
+      - user_agent: "text"
+      - timestamp: "timestamp default now()"
+      
+  tokens_apresentacao:
+    tabela: "tokens_apresentacao"
+    campos:
+      - id: "uuid primary key"
+      - projeto_id: "uuid references projetos(id)"
+      - usuario_id: "uuid references usuarios(id)"
+      - token: "varchar(255) unique"
+      - perfil_visualizacao: "enum('ADMIN','DIR','GG','GP','ME')"
+      - expira_em: "timestamp"
+      - ativo: "boolean default true"
+      - acessos: "integer default 0"
+      - ultimo_acesso: "timestamp"
+      - created_at: "timestamp default now()"
+
+# ==========================================
+# EDGE FUNCTIONS COMPLETAS
+# ==========================================
+
+edge_functions:
+  autenticacao:
+    - path: "/auth/login"
+      metodo: POST
+      descricao: "Login com verificação de perfil ativo"
+      
+    - path: "/auth/profile"
+      metodo: GET
+      descricao: "Dados do usuário + permissões"
+      
+  gestao_usuarios:
+    - path: "/usuarios/listar"
+      metodo: GET
+      validacao: "Apenas ADMIN"
+      
+    - path: "/usuarios/criar"
+      metodo: POST
+      validacao: "Apenas ADMIN"
+      
+  gestao_projetos:
+    - path: "/projetos/listar"
+      metodo: GET
+      logica: "Filtrar por perfil e permissões"
+      
+    - path: "/projetos/criar"
+      metodo: POST
+      validacao: "ADMIN ou GP"
+      auditoria: "Log completo"
+      
+    - path: "/projetos/{id}"
+      metodo: GET
+      logica: "Dados conforme perfil"
+      
+    - path: "/projetos/{id}/criticidade"
+      metodo: GET
+      descricao: "Calcula score de criticidade em tempo real"
+      algoritmo:
+        - "Peso dos riscos: 40%"
+        - "Atraso cronograma: 30%"
+        - "Estouro orçamento: 30%"
+        - "Resultado: 0-100"
+        
+  apresentacao:
+    - path: "/apresentacao/gerar-token"
+      metodo: POST
+      descricao: "Gera token temporário para compartilhamento"
+      
+    - path: "/apresentacao/{token}"
+      metodo: GET
+      descricao: "Dados do projeto filtrados por perfil do token"
+      
+    - path: "/apresentacao/{token}/slides"
+      metodo: GET
+      descricao: "Estrutura dos slides conforme perfil"
+
+# ==========================================
+# FLUXO VISUAL COMPLETO - GESTÃO
+# ==========================================
+
+fluxo_visual_gestao:
+  tela_login:
+    layout: "Centralizado, minimalista"
+    componentes:
+      - "Logo da empresa"
+      - "Formulário email/senha"
+      - "Botão 'Entrar'"
+      - "Link 'Esqueci minha senha'"
+    cores: "Gradiente azul corporativo"
+    
+  dashboard_principal:
+    layout: "Sidebar + Header + Main Content"
+    sidebar:
+      - "Logo + nome do usuário"
+      - "Menu navegação (Projetos, Usuários, Relatórios)"
+      - "Indicador de perfil com cor"
+    header:
+      - "Breadcrumb"
+      - "Notificações"
+      - "Avatar + dropdown perfil"
+    main_content:
+      - "Cards de métricas (Total projetos, Em andamento, Críticos)"
+      - "Gráfico de barras (Projetos por status)"
+      - "Lista de projetos críticos"
+      - "Timeline de atividades recentes"
+      
+  lista_projetos:
+    layout: "Tabela responsiva + filtros"
+    componentes:
+      - "Barra de filtros (Status, Gerente, Criticidade)"
+      - "Botão 'Novo Projeto'"
+      - "Tabela com colunas: Nome, Status, Gerente, Criticidade (gauge mini), Ações"
+      - "Paginação"
+    interacoes:
+      - "Click na linha → Detalhes do projeto"
+      - "Gauge mini → Tooltip com detalhes"
+      
+  formulario_projeto:
+    layout: "Wizard multi-step"
+    steps:
+      1: "Informações Básicas"
+      2: "Cronograma e Marcos"
+      3: "Equipe e Responsáveis"
+      4: "Orçamento (se permitido)"
+      5: "Riscos Iniciais"
+    componentes:
+      - "Stepper horizontal"
+      - "Formulário responsivo"
+      - "Botões Voltar/Próximo/Salvar"
+      
+  detalhes_projeto:
+    layout: "Tabs horizontais"
+    tabs:
+      - "Visão Geral"
+      - "Cronograma"
+      - "Financeiro" # (se permitido)
+      - "Riscos"
+      - "Equipe"
+      - "Documentos"
+      - "Histórico"
+    visao_geral:
+      - "Header com nome, status, gauge criticidade"
+      - "Cards de métricas"
+      - "Gráfico de progresso"
+      - "Últimas atividades"
+
+# ==========================================
+# FLUXO VISUAL COMPLETO - APRESENTAÇÃO
+# ==========================================
+
+fluxo_visual_apresentacao:
+  acesso_apresentacao:
+    metodos:
+      1: "Link direto com token"
+      2: "Botão 'Apresentar' na gestão"
+    validacao: "Token válido + perfil ativo"
+    
+  tela_carregamento:
+    layout: "Fullscreen com loading elegante"
+    componentes:
+      - "Logo animado"
+      - "Barra de progresso"
+      - "Texto: 'Carregando apresentação...'"
+    duracao: "2-3 segundos"
+    
+  slide_capa:
+    layout: "Fullscreen, design executivo"
+    componentes:
+      - "Nome do projeto (título grande)"
+      - "Subtítulo com período"
+      - "Gauge de criticidade (destaque central)"
+      - "Nome do gerente responsável"
+      - "Data da apresentação"
+    cores: "Conforme perfil do usuário"
+    animacao: "Fade in suave"
+    
+  slide_visao_geral:
+    layout: "Grid 2x2"
+    quadrantes:
+      1: "Status atual (card com ícone)"
+      2: "Progresso (circular progress)"
+      3: "Equipe (avatars + contador)"
+      4: "Próximo marco (countdown)"
+    transicao: "Slide da direita"
+    
+  slide_cronograma:
+    layout: "Timeline horizontal"
+    componentes:
+      - "Gantt interativo"
+      - "Marcos destacados"
+      - "Linha do tempo atual"
+      - "Atrasos em vermelho"
+    interacao: "Zoom e pan"
+    
+  slide_financeiro: # (apenas para perfis autorizados)
+    layout: "Dashboard financeiro"
+    componentes:
+      - "Gauge de ROI"
+      - "Gráfico pizza (Custos vs Receita)"
+      - "Linha temporal de gastos"
+      - "KPIs financeiros"
+    condicional: "Só exibe se perfil permitir"
+    
+  slide_riscos:
+    layout: "Matriz de riscos + lista"
+    componentes:
+      - "Scatter plot (Probabilidade x Impacto)"
+      - "Lista de riscos críticos"
+      - "Gráfico de barras (Riscos por categoria)"
+    cores: "Heatmap vermelho-verde"
+    
+  slide_equipe:
+    layout: "Organograma + métricas"
+    componentes:
+      - "Cards da equipe com fotos"
+      - "Gráfico de alocação"
+      - "Métricas de produtividade"
+    animacao: "Cards aparecem em sequência"
+    
+  slide_conclusao:
+    layout: "Resumo executivo"
+    componentes:
+      - "Status geral (grande)"
+      - "Próximos passos"
+      - "Contatos da equipe"
+      - "QR Code para mais detalhes"
+    
+  controles_apresentacao:
+    posicao: "Canto inferior direito"
+    componentes:
+      - "Botão Play/Pause (auto-advance)"
+      - "Navegação anterior/próximo"
+      - "Indicador de slide (1/8)"
+      - "Botão fullscreen"
+      - "Botão compartilhar"
+      - "Botão exportar PDF"
+    visibilidade: "Fade out após 3s de inatividade"
+
+# ==========================================
+# COMPONENTES VISUAIS ESPECÍFICOS
+# ==========================================
+
+componentes_especificos:
+  gauge_criticidade:
+    biblioteca: "ECharts Gauge"
+    configuracao:
+      - "Escala: 0-100"
+      - "Cores: Verde (0-33), Amarelo (34-66), Vermelho (67-100)"
+      - "Animação suave na mudança de valor"
+      - "Tooltip com detalhes do cálculo"
+    tamanhos:
+      - "Mini: 80x80px (tabelas)"
+      - "Médio: 200x200px (cards)"
+      - "Grande: 400x400px (apresentação)"
+      
+  timeline_gantt:
+    biblioteca: "D3.js customizado"
+    funcionalidades:
+      - "Zoom temporal"
+      - "Drag & drop de marcos"
+      - "Indicador de progresso"
+      - "Dependências entre tarefas"
+    responsivo: "Adapta para mobile"
+    
+  matriz_riscos:
+    biblioteca: "ECharts Scatter"
+    eixos:
+      - "X: Probabilidade (1-5)"
+      - "Y: Impacto (1-5)"
+    interacao:
+      - "Hover: detalhes do risco"
+      - "Click: abrir modal de edição"
+    cores: "Heatmap baseado no nível de risco"
+    
+  cards_metricas:
+    design: "Material Design 3"
+    variantes:
+      - "Simples: valor + label"
+      - "Com gráfico: mini chart integrado"
+      - "Com comparação: valor atual vs anterior"
+    animacao: "CountUp nos números"
+
+# ==========================================
+# RESPONSIVIDADE E DISPOSITIVOS
+# ==========================================
+
+responsividade:
+  breakpoints:
+    - "xs: 0-599px (mobile)"
+    - "sm: 600-959px (tablet)"
+    - "md: 960-1279px (desktop pequeno)"
+    - "lg: 1280-1919px (desktop)"
+    - "xl: 1920px+ (desktop grande)"
+    
+  adaptacoes:
+    mobile:
+      - "Sidebar colapsável"
+      - "Tabelas viram cards"
+      - "Gráficos simplificados"
+    tablet:
+      - "Layout híbrido"
+      - "Gestos touch para navegação"
+    desktop:
+      - "Layout completo"
+      - "Múltiplas colunas"
+      - "Tooltips avançados"
+      
+  apresentacao_dispositivos:
+    tv_sala_reuniao:
+      - "Resolução 4K otimizada"
+      - "Fontes grandes"
+      - "Contraste alto"
+    projetor:
+      - "Cores ajustadas para projeção"
+      - "Elementos maiores"
+    tablet_apresentacao:
+      - "Controles touch"
+      - "Orientação landscape forçada"
+
+# ==========================================
+# PERFORMANCE E OTIMIZAÇÕES
+# ==========================================
+
+performance:
+  frontend:
+    - "Lazy loading de componentes"
+    - "Virtualização de listas grandes"
+    - "Cache de gráficos renderizados"
+    - "Debounce em filtros"
+    - "Service Worker para cache offline"
+    
+  backend:
+    - "Cache Redis nas Edge Functions"
+    - "Queries otimizadas com índices"
+    - "Compressão de respostas JSON"
+    - "CDN para assets estáticos"
+    
+  graficos:
+    - "Canvas rendering para datasets grandes"
+    - "WebGL para visualizações 3D"
+    - "Throttling de animações"
+    - "Lazy loading de dados não visíveis"
+
+# ==========================================
+# SEGURANÇA E COMPLIANCE
+# ==========================================
+
+seguranca:
+  tokens_apresentacao:
+    - "Expiração automática (24h default)"
+    - "Rate limiting por IP"
+    - "Log de todos os acessos"
+    - "Revogação manual de tokens"
+    
+  auditoria:
+    - "Log de todas as ações"
+    - "Rastreamento de alterações"
+    - "Backup automático diário"
+    - "Retenção de logs por 2 anos"
+    
+  dados_sensiveis:
+    - "Criptografia de dados financeiros"
+    - "Mascaramento conforme perfil"
+    - "Watermark em apresentações"
+    - "Screenshot protection (tentativa)"
+
+# ==========================================
+# ROADMAP DE DESENVOLVIMENTO
+# ==========================================
+
+fases_desenvolvimento:
+  mvp_fase1: # 8 semanas
+    - "Autenticação e perfis"
+    - "CRUD básico de projetos"
+    - "Dashboard de gestão simples"
+    - "Apresentação básica (5 slides)"
+    
+  fase2: # 6 semanas
+    - "Gestão completa de riscos"
+    - "Módulo financeiro"
+    - "Apresentação avançada (todos os slides)"
+    - "Compartilhamento com tokens"
+    
+  fase3: # 4 semanas
+    - "Gráficos avançados (WebGL)"
+    - "Exportação PDF"
+    - "Mobile app companion"
+    - "Integrações externas"
+    
+  fase4: # 4 semanas
+    - "IA para insights automáticos"
+    - "Relatórios customizáveis"
+    - "API pública"
+    - "White-label options"
+
+# ==========================================
+# MÉTRICAS E KPIs
+# ==========================================
+
+metricas_sucesso:
+  usuarios:
+    - "Tempo médio de criação de projeto: < 5 min"
+    - "Taxa de adoção por departamento: > 80%"
+    - "Satisfação do usuário: > 4.5/5"
+    
+  performance:
+    - "Tempo de carregamento dashboard: < 2s"
+    - "Tempo de geração de apresentação: < 3s"
+    - "Uptime: > 99.9%"
+    
+  negocio:
+    - "Redução de tempo em reuniões: 30%"
+    - "Melhoria na visibilidade de projetos: 50%"
+    - "Aumento na taxa de projetos concluídos no prazo: 25%"

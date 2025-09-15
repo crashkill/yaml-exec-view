@@ -1,3 +1,4 @@
+import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,40 +11,39 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { User, Settings, LogOut, UserCircle, Shield } from "lucide-react";
+import { Settings, LogOut, UserCircle, Shield, Loader2 } from "lucide-react";
+import { getUserProfileConfig, getInitials } from '@/utils';
+import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '@/constants';
 
 export function UserMenu() {
-  // Mock user data - será substituído por dados reais do Supabase
-  const user = {
-    name: "Carlos Silva",
-    email: "carlos.silva@empresa.com",
-    role: "ADMIN",
-    department: "TI",
-    avatar: null,
-  };
+  const { user, logout, loading } = useAuth();
+  const navigate = useNavigate();
 
-  const getRoleBadge = (role: string) => {
-    const roleConfig = {
-      ADMIN: { label: "Administrador", className: "bg-admin text-white" },
-      DIR: { label: "Diretor", className: "bg-director text-white" },
-      GG: { label: "Gerente Geral", className: "bg-general-manager text-white" },
-      GP: { label: "Gerente de Projetos", className: "bg-project-manager text-white" },
-      ME: { label: "Membro da Equipe", className: "bg-team-member text-white" },
-    };
-    
-    return roleConfig[role as keyof typeof roleConfig] || roleConfig.ME;
-  };
+  if (!user) return null;
 
-  const roleBadge = getRoleBadge(user.role);
+  const profileConfig = getUserProfileConfig(user.perfil);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate(ROUTES.LOGIN);
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
+  };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+        <Button variant="ghost" className="relative h-10 w-10 rounded-full" disabled={loading}>
           <Avatar className="h-10 w-10 border-2 border-border">
-            <AvatarImage src={user.avatar || undefined} alt={user.name} />
-            <AvatarFallback className="bg-gradient-primary text-white font-medium">
-              {user.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+            <AvatarImage src={user.avatar_url || undefined} alt={user.nome} />
+            <AvatarFallback 
+              className="text-white font-medium"
+              style={{ backgroundColor: profileConfig.color }}
+            >
+              {getInitials(user.nome)}
             </AvatarFallback>
           </Avatar>
         </Button>
@@ -53,16 +53,19 @@ export function UserMenu() {
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-2">
             <div className="flex items-center gap-2">
-              <p className="text-sm font-medium leading-none">{user.name}</p>
-              <Badge className={`text-xs ${roleBadge.className}`}>
-                {roleBadge.label}
+              <p className="text-sm font-medium leading-none">{user.nome}</p>
+              <Badge 
+                className="text-xs text-white"
+                style={{ backgroundColor: profileConfig.color }}
+              >
+                {profileConfig.label}
               </Badge>
             </div>
             <p className="text-xs leading-none text-muted-foreground">
               {user.email}
             </p>
             <p className="text-xs leading-none text-muted-foreground">
-              {user.department}
+              {user.departamento}
             </p>
           </div>
         </DropdownMenuLabel>
@@ -86,8 +89,16 @@ export function UserMenu() {
         
         <DropdownMenuSeparator />
         
-        <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive">
-          <LogOut className="mr-2 h-4 w-4" />
+        <DropdownMenuItem 
+          className="cursor-pointer text-destructive focus:text-destructive"
+          onClick={handleLogout}
+          disabled={loading}
+        >
+          {loading ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <LogOut className="mr-2 h-4 w-4" />
+          )}
           <span>Sair</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
