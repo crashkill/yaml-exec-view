@@ -159,7 +159,7 @@ export class ProjectsAPI extends BaseAPI {
 
     const { data, error } = await supabase
       .from('projetos')
-      .insert(newProject as Database['public']['Tables']['projetos']['Insert'])
+      .insert([newProject as Database['public']['Tables']['projetos']['Insert']]) // Wrapped in array
       .select()
       .single();
     
@@ -200,7 +200,7 @@ export class ProjectsAPI extends BaseAPI {
 
     const { data, error } = await supabase
       .from('projetos')
-      .update(updatedData as Database['public']['Tables']['projetos']['Update'])
+      .update(updatedData) // Removed explicit cast
       .eq('id', id)
       .select()
       .single();
@@ -261,7 +261,7 @@ export class ProjectsAPI extends BaseAPI {
           criticidade_score: criticalityScore,
           criticidade_label: criticalityLabel,
           updated_at: new Date().toISOString()
-      } as Database['public']['Tables']['projetos']['Update'])
+      }) // Removed explicit cast
       .eq('id', projectId)
       .select('criticidade_score')
       .single();
@@ -282,14 +282,14 @@ export class ProjectsAPI extends BaseAPI {
     const user = await this.getCurrentUser();
     if (!user) return;
 
-    await supabase.from('historico_projetos').insert({
+    await supabase.from('historico_projetos').insert([{ // Wrapped in array
       projeto_id: projectId,
       usuario_id: user.id,
       acao: action,
       valores_anteriores: oldValues,
       valores_novos: newValues,
       timestamp: new Date().toISOString()
-    } as Database['public']['Tables']['historico_projetos']['Insert']);
+    } as Database['public']['Tables']['historico_projetos']['Insert']]);
   }
 }
 
@@ -326,7 +326,7 @@ export class RisksAPI extends BaseAPI {
 
     const { data, error } = await supabase
       .from('riscos')
-      .insert(newRisk as Database['public']['Tables']['riscos']['Insert'])
+      .insert([newRisk as Database['public']['Tables']['riscos']['Insert']]) // Wrapped in array
       .select()
       .single();
     
@@ -350,7 +350,7 @@ export class RisksAPI extends BaseAPI {
 
     const { data, error } = await supabase
       .from('riscos')
-      .update(updatedData as Database['public']['Tables']['riscos']['Update'])
+      .update(updatedData) // Removed explicit cast
       .eq('id', id)
       .select()
       .single();
@@ -396,7 +396,7 @@ export class UsersAPI extends BaseAPI {
 
     const { data, error } = await supabase
       .from('usuarios')
-      .insert(newUser as Database['public']['Tables']['usuarios']['Insert'])
+      .insert([newUser as Database['public']['Tables']['usuarios']['Insert']]) // Wrapped in array
       .select()
       .single();
     
@@ -428,7 +428,7 @@ export class PresentationAPI extends BaseAPI {
 
     const { data, error } = await supabase
       .from('tokens_apresentacao')
-      .insert(tokenData as Database['public']['Tables']['tokens_apresentacao']['Insert'])
+      .insert([tokenData as Database['public']['Tables']['tokens_apresentacao']['Insert']]) // Wrapped in array
       .select()
       .single();
     
@@ -483,7 +483,7 @@ export class PresentationAPI extends BaseAPI {
       .update({ 
         acessos: tokenResponse.data.acessos + 1,
         ultimo_acesso: new Date().toISOString()
-      } as Database['public']['Tables']['tokens_apresentacao']['Update'])
+      }) // Removed explicit cast
       .eq('id', tokenResponse.data.id);
 
     return {
